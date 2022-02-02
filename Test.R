@@ -85,24 +85,34 @@ ui <- fluidPage(
                           h3("Grafico descrittivo"),
                           hr(),
                           br(),
-                          plotOutput("Stat_UniPlot")
+                          plotOutput("Stat_UniPlot"),
+                          hr(),
+                          h3("Scarica le statistiche descrittive: ",
+                          downloadButton("Report01", label="Genera report"))
                         ))),
-             # tabPanel("Statistiche Bivariate",
-             #          titlePanel("Bivariate!"),
-             #          sidebarLayout(
-             #            sidebarPanel(
-             #              selectInput("variableBI01", "Selezione prima variabile:",
-             #                          choices = c(not_sel)),
-             #            selectInput("variableBI02", "Selezione seconda variabile:",
-             #                        choices = c(not_sel))),
-             #            mainPanel(
-             #              h3(textOutput("Statistiche descrittive")),
-             #              h3(textOutput("Grafico")),
-             #              br()
-             #              #plotOutput("ggplot", brush = brushOpts("plot_brush",resetOnNew=T)),
-             #              #plotOutput("ggplot", brush = "plot_brush"),
-             #              #verbatimTextOutput("Selezione")
-             #            ))),
+             tabPanel("Statistiche Bivariate",
+                       titlePanel("Bivariate!"),
+                       sidebarLayout(
+                         sidebarPanel(
+                           selectInput("variableBI01", "Selezione prima variabile:",
+                                       choices = c(not_sel)),
+                         selectInput("variableBI02", "Selezione seconda variabile:",
+                                     choices = c(not_sel))),
+                         mainPanel(
+                           h3("Statistiche descrittive"),
+                           hr(),
+                           p("Le variabili categoriche vengono trattate come numeriche!."),
+                           verbatimTextOutput("Stat_DescrittiveBi"),
+                           hr(),
+                           h3("Correlazione"),
+                           verbatimTextOutput("CorrelazioneBi"),
+                           h3("Grafico"),
+                           hr(),
+                           plotOutput("Stat_BiPlot", brush = brushOpts("plot_brush",resetOnNew=T))
+                           #plotOutput("ggplot", brush = "plot_brush"),
+                           #verbatimTextOutput("Selezione")
+                         ))
+             ),
              #            plotOutput("ggplot", brush = brushOpts("plot_brush",resetOnNew=T)),
              # Sezione Commenti ----
              tabPanel("Lo sapevate?",
@@ -164,7 +174,7 @@ server <- function(input, output,session) {
     }
   })
 
-  # Statistiche descrittive
+  # Statistiche descrittive univariate
   output$Stat_Descrittive <- renderPrint({
     # Carico i dati
     data <- reactive_data()
@@ -175,6 +185,55 @@ server <- function(input, output,session) {
                         choices = colnames(data),
                         selected = input$variableUNI)
       summary(data[[input$variableUNI]])
+    }
+  })
+
+  # Statistiche descrittive bivariate
+  output$Stat_DescrittiveBi <- renderPrint({
+    # Carico i dati
+    data <- reactive_data()
+    if(is.null(data)){
+      return(NULL)
+    }else{
+      updateSelectInput(session, "variableBI01",
+                        choices = colnames(data),
+                        selected = input$variableBI01)
+      updateSelectInput(session, "variableBI02",
+                        choices = colnames(data),
+                        selected = input$variableBI02)
+      TMP <- cbind(data[[input$variableBI01]], data[[input$variableBI02]])
+      colnames(TMP) <- c(colnames(data)[colnames(data) == input$variableBI01],
+                         colnames(data)[colnames(data) == input$variableBI02])
+      summary(TMP)
+    }
+  })
+
+  
+  # Correlazione fra due variabili numeriche
+  output$CorrelazioneBi <- renderPrint({
+    # Carico i dati
+    data <- reactive_data()
+    if(is.null(data)){
+      return(NULL)
+      # paste("Nessuna variabile selezionata.")
+    }else{
+      updateSelectInput(session, "variableBI01",
+                        choices = colnames(data),
+                        selected = input$variableBI01)
+      updateSelectInput(session, "variableBI02",
+                        choices = colnames(data),
+                        selected = input$variableBI02)
+      if(!is.factor(data[[input$variableBI01]]) & !is.factor(data[[input$variableBI02]])) {
+        Risultato <- data.frame(Correlazione = c(
+          cor(x=data[[input$variableBI01]], y=data[[input$variableBI02]], use = "pairwise.complete.obs"),
+          cor(x=data[[input$variableBI01]], y=data[[input$variableBI02]], use = "pairwise.complete.obs", method = "kendall"),
+          cor(x=data[[input$variableBI01]], y=data[[input$variableBI02]], use = "pairwise.complete.obs", method = "spearman"))
+          )
+        rownames(Risultato) <- c("Pearson", "Kendall", "Spearman")
+        print(Risultato)
+      } else {
+        return(NULL)
+      }
     }
   })
 
@@ -216,6 +275,69 @@ server <- function(input, output,session) {
       else paste("La variabile e' di tipo numerico.")
     }
   })
+
+  # Grafico Bivariato: diagramma di dispersione
+  output$Stat_BiPlot <- renderPlot({
+    
+    # Carico i dati
+    data <- reactive_data()
+    if(is.null(data)){
+      return(NULL)
+      
+    }else{
+      # Carico dati e seleziono variabile
+      updateSelectInput(session, "variableBI01",
+                        choices = colnames(data),
+                        selected = input$variableBI01)
+      updateSelectInput(session, "variableBI02",
+                        choices = colnames(data),
+                        selected = input$variableBI02)
+    if(!is.factor(data[[input$variableBI01]]) & !is.factor(data[[input$variableBI02]])) {
+      ggplot(data, aes_string(x=colnames(data)[colnames(data) == input$variableBI01],
+                              y=colnames(data)[colnames(data) == input$variableBI02])) +
+        geom_point() 
+    } else {
+      return(NULL)
+    }
+    }
+  })
+
+  # Controllo sul tipo di variabile letta
+  output$Fattore <- renderText({
+    # Carico i dati
+    data <- reactive_data()
+    if(is.null(data)){
+      return(NULL)
+      paste("Nessuna variabile selezionata.")
+    }else{
+      updateSelectInput(session, "variableUNI",
+                        choices = colnames(data),
+                        selected = input$variableUNI)
+      if(is.factor(data[[input$variableUNI]])) 
+        paste("La variabile e' di tipo categorico.") 
+      else paste("La variabile e' di tipo numerico.")
+    }
+  })
+
+  # Report01 dati Univariati
+  output$Report01 <- downloadHandler(
+    filename <- function(){paste0("Report.html")},
+    content = function(file) {
+      params <- list(DatiRMD = reactive_data(),
+                     DatiReportRMD = input$variableUNI)
+          id <- showNotification(
+            "Rendering report...",
+            duration = NULL,
+            closeButton = FALSE
+          )
+      on.exit(removeNotification(id), add = TRUE)
+      rmarkdown::render("report.Rmd", output_file = file,
+                        params = params,
+                        envir = new.env(parent = globalenv())
+      )
+    }
+  )
+
 } # end server
 
 # Esecuzione dell'applicazione

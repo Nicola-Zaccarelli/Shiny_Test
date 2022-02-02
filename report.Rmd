@@ -1,0 +1,41 @@
+---
+title: "Report dinamico"
+output: html_document
+params:
+  giorno: !r lubridate::today()
+  DatiReportRMD: NA
+  DatiRMD: NA
+---
+```{r, echo=FALSE}
+library(lubridate)
+library(ggplot2)
+```
+
+Il report di oggi e' stato generato `r params$giorno`.
+
+Un estratto dei dati utilizzati: 
+
+```{r, echo=FALSE}
+head(params$DatiRMD[[params$DatiReportRMD]])
+```
+
+Il nome della variabile: `r params$DatiReportRMD`. 
+
+Le statistiche descrittive sono:
+```{r, echo=FALSE}
+summary(params$DatiRMD[[params$DatiReportRMD]])
+```
+
+Il grafico associato e':
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+if(is.factor(params$DatiRMD[[params$DatiReportRMD]])) {
+       data2 <- as.data.frame(table(params$DatiRMD[[params$DatiReportRMD]]))
+       colnames(data2) <- c("Livelli", "Freq")
+       ggplot(data2, aes(x=Livelli, y=Freq)) +  geom_bar(stat = "identity")
+     } else {
+      ggplot(params$DatiRMD, aes(x=params$DatiRMD[[params$DatiReportRMD]]))+
+      geom_histogram(na.rm = TRUE, fill=I("blue"), col=I("red")) +
+      xlab(paste0(params$DatiReportRMD))
+       }
+```
